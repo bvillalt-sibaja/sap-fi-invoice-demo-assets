@@ -3438,6 +3438,21 @@ class SAPApp(tk.Tk):
         self.geometry("1180x760")
         self.configure(bg=WINDOW_BG)
 
+        def _debug_click(event):
+            try:
+                cur = self.grab_current()
+            except tk.TclError:
+                cur = "ERR"
+            try:
+                with open("/tmp/menu_debug.log", "a") as f:
+                    f.write(
+                        f"CLICK x_root={event.x_root} y_root={event.y_root} "
+                        f"target={event.widget} grab_current={cur}\n"
+                    )
+            except Exception:
+                pass
+        self.bind_all("<Button-1>", _debug_click, add="+")
+
         self._build_menubar()
         self._build_toolbar()
         self._build_title_bar()
