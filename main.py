@@ -1091,12 +1091,8 @@ def build_menu_strip(parent, defs, bg=None):
     app = parent.controller
 
     def open_menu(items, mb):
-        with open("/tmp/menu_debug.log", "a") as f:
-            f.write(f"open_menu fired for {mb['text']!r}\n")
         menu = CustomMenu(strip, app, items)
         menu.popup(mb.winfo_rootx(), mb.winfo_rooty() + mb.winfo_height())
-        with open("/tmp/menu_debug.log", "a") as f:
-            f.write(f"popup() returned, active_menu={app._active_menu!r} mapped={menu.winfo_ismapped()} geo={menu.winfo_geometry()}\n")
 
     for label, items in defs:
         mb = tk.Button(
@@ -3441,18 +3437,6 @@ class SAPApp(tk.Tk):
         self.title(f"{APP_TITLE} - {SCREENS[HOME_TCODE][1]}")
         self.geometry("1180x760")
         self.configure(bg=WINDOW_BG)
-
-        def _debug_click(event):
-            try:
-                cur = self.grab_current()
-            except tk.TclError:
-                cur = "ERR"
-            with open("/tmp/menu_debug.log", "a") as f:
-                f.write(
-                    f"CLICK x_root={event.x_root} y_root={event.y_root} "
-                    f"target={event.widget} grab_current={cur}\n"
-                )
-        self.bind_all("<Button-1>", _debug_click, add="+")
 
         self._build_menubar()
         self._build_toolbar()
