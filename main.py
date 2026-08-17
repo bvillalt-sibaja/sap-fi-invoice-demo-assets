@@ -2010,10 +2010,27 @@ class AttachmentListPopup(tk.Toplevel):
         self.data.add_attachment(self.doc_number, filename)
         self.refresh()
         self.status_target.set_status("The attachment was successfully created", ok=True)
+        self._regrab()
 
     def _on_deny(self):
         # Cancels attachment creation; attachment list is left unchanged.
-        pass
+        self._regrab()
+
+    def _regrab(self):
+        # Tk's grab is a single global pointer, not a stack: when a nested
+        # modal (SecurityDialog, itself opened from FilePickerPopup, itself
+        # opened from here) is destroyed, the grab drops to nothing rather
+        # than reverting to whichever widget held it before -- it does NOT
+        # automatically come back to this popup just because it's still
+        # open. Never mattered when only one attachment was ever created per
+        # run; creating a second one exposed it: with no active grab, this
+        # window can still visually be clicked, but Tk-level dispatch for
+        # its own children (the "New" button included) become unreliable
+        # once nothing owns the grab. Re-establish it explicitly.
+        try:
+            self.grab_set()
+        except tk.TclError:
+            pass
 
     def close(self):
         self.destroy()
@@ -3437,21 +3454,6 @@ class SAPApp(tk.Tk):
         self.title(f"{APP_TITLE} - {SCREENS[HOME_TCODE][1]}")
         self.geometry("1180x760")
         self.configure(bg=WINDOW_BG)
-
-        def _debug_click(event):
-            try:
-                cur = self.grab_current()
-            except tk.TclError:
-                cur = "ERR"
-            try:
-                with open("/tmp/menu_debug.log", "a") as f:
-                    f.write(
-                        f"CLICK x_root={event.x_root} y_root={event.y_root} "
-                        f"target={event.widget} grab_current={cur}\n"
-                    )
-            except Exception:
-                pass
-        self.bind_all("<Button-1>", _debug_click, add="+")
 
         self._build_menubar()
         self._build_toolbar()
