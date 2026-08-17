@@ -947,56 +947,160 @@ def toolbar_button(parent, image, name, tooltip, command, bg=None):
     return b
 
 
+class CustomMenu(tk.Toplevel):
+    """Cross-platform stand-in for `tk.Menu`'s `tk_popup()`: renders a
+    dropdown as plain Frame/Label rows in a borderless Toplevel instead of
+    relying on the OS-native menu (NSMenu on macOS). Confirmed via a direct
+    repro that a native `tk.Menu` popup can fail to actually post at all in
+    a constrained/headless window-server context -- `winfo_ismapped()`
+    stays False and its geometry stays a degenerate `1x1+0+0` -- even though
+    this app's *other* windows/buttons/dialogs (plain `Toplevel`s) render
+    and receive clicks there just fine; the failure is specific to native
+    menu-tracking, not to Tk windows in general, and reproduces identically
+    across two different macOS Python builds (Homebrew and python.org). A
+    plain Toplevel doesn't depend on that native menu-tracking machinery at
+    all, so it posts exactly as reliably as every other popup in this app,
+    on the automation host and on a real desktop session alike -- and its
+    items are ordinary widgets the automation bridge can locate the exact
+    same way it already locates any other widget (bbox), instead of needing
+    `tk.Menu`-specific `yposition()`/`entrycget()` introspection.
+
+    `items` uses the same (label, command) / (label, command, accelerator) /
+    (None, None) tuple shape the old `tk.Menu`-based menus used, plus an
+    optional 4th element -- a nested items list -- to render a cascade
+    (opened on hover, SAP's own object-services submenus). Modal like every
+    other popup in this app (`grab_set`); Escape closes it without invoking
+    anything.
+    """
+
+    HILITE = "#DCE6F1"
+
+    def __init__(self, parent, app, items):
+        super().__init__(parent)
+        self.app = app
+        self.overrideredirect(True)
+        self.configure(bg="#8F8F8F")  # 1px border, via padding around a white body
+        try:
+            self.attributes("-topmost", True)
+        except tk.TclError:
+            pass
+        self.rows = []
+        self._submenu = None
+        body = tk.Frame(self, bg="white")
+        body.pack(padx=1, pady=1)
+        for item in items:
+            self._add_item(body, item)
+        self.withdraw()
+        self.bind("<Escape>", lambda e: self.close())
+
+    def _add_item(self, body, item):
+        if item[0] is None:
+            tk.Frame(body, height=1, bg="#D9D9D9").pack(fill="x", padx=1, pady=3)
+            return
+        label, command = item[0], item[1]
+        accelerator = item[2] if len(item) > 2 else ""
+        submenu_items = item[3] if len(item) > 3 else None
+        row = tk.Frame(body, bg="white")
+        row.pack(fill="x")
+        lbl = tk.Label(row, text=label, bg="white", anchor="w", font=FONT_SMALL, padx=16, pady=4)
+        lbl.pack(side="left", fill="x", expand=True)
+        tail = tk.Label(
+            row, text=("▸" if submenu_items else accelerator),
+            bg="white", fg="#8A8A8A", font=FONT_SMALL, padx=10,
+        )
+        tail.pack(side="right")
+        entry = {
+            "label": label, "frame": row, "widgets": (row, lbl, tail),
+            "command": command, "submenu_items": submenu_items,
+        }
+        for w in entry["widgets"]:
+            w.bind("<Enter>", lambda e, en=entry: self._enter(en))
+            w.bind("<Leave>", lambda e, en=entry: self._leave(en))
+            w.bind("<ButtonRelease-1>", lambda e, en=entry: self._click(en))
+        self.rows.append(entry)
+
+    def _enter(self, entry):
+        for w in entry["widgets"]:
+            w.configure(bg=self.HILITE)
+        self._close_submenu()
+        if entry["submenu_items"]:
+            sub = CustomMenu(self.master, self.app, entry["submenu_items"])
+            x = entry["frame"].winfo_rootx() + entry["frame"].winfo_width()
+            y = entry["frame"].winfo_rooty()
+            sub.update_idletasks()
+            sub.geometry(f"+{x}+{y}")
+            sub.deiconify()
+            sub.lift()
+            self._submenu = sub
+
+    def _leave(self, entry):
+        for w in entry["widgets"]:
+            w.configure(bg="white")
+
+    def _close_submenu(self):
+        if self._submenu is not None:
+            self._submenu.destroy()
+            self._submenu = None
+
+    def _click(self, entry):
+        if entry["submenu_items"]:
+            return
+        command = entry["command"]
+        self.close()
+        if command:
+            command()
+
+    def find_item(self, label):
+        for entry in self.rows:
+            if entry["label"] == label:
+                return entry["frame"]
+        return None
+
+    def popup(self, x, y):
+        self.update_idletasks()
+        self.geometry(f"+{x}+{y}")
+        self.deiconify()
+        self.lift()
+        self.app._active_menu = self  # opt-in automation bridge: currently-posted menu
+        self.focus_force()
+        self.grab_set()
+
+    def close(self):
+        self._close_submenu()
+        if getattr(self.app, "_active_menu", None) is self:
+            self.app._active_menu = None
+        try:
+            self.grab_release()
+        except tk.TclError:
+            pass
+        self.destroy()
+
+
 def build_menu_strip(parent, defs, bg=None):
     """Renders a per-screen SAP-style transaction menu bar (Document/Edit/Goto/...)
-    as a row of Menubuttons, since a Tk root window can only own one native
-    (OS-level) menu bar. `defs` is a list of (label, items) where items is a
-    list of (item_label, command) or (item_label, command, accelerator)
-    tuples; item_label of None inserts a separator; command of None disables
-    the item. `accelerator`, if given, renders as SAP's right-aligned
-    keyboard-shortcut label (e.g. 'Ctrl+F2') -- purely a visual label here,
-    the real key isn't bound.
-
-    Posted via an explicit `menu.tk_popup(...)` call from a plain `tk.Button`'s
-    `command=` (the same mechanism the object-services/attachment "New" context
-    menus already use successfully elsewhere in this file) rather than the usual
-    `tk.Menubutton(menu=...)` auto-post wiring: on macOS/Aqua, confirmed via a
-    minimal repro, a Menubutton's own click-to-post binding -- and, separately,
-    an explicit `<Button-1>` bind calling tk_popup on a Menubutton -- both
-    reliably fail to post their menu at all once the *root* window also has a
-    native menu bar configured via `.config(menu=...)`, which SAPApp does to
-    render its own outer chrome; a plain Button + command callback doing the
-    exact same tk_popup call, confirmed via the same repro, does not have this
-    problem. That's a real, pre-existing defect for any mouse user on this
-    platform/Tk combination (not just for automation), so it's fixed here
-    directly rather than papered over. `tk.Button` and `tk.Menubutton` share
-    the same default relief/padding/font rendering, so this doesn't change
-    appearance.
+    as a row of buttons, each posting a `CustomMenu` (see above) rather than a
+    native `tk.Menu`. `defs` is a list of (label, items) where items is a list
+    of (item_label, command) or (item_label, command, accelerator) tuples;
+    item_label of None inserts a separator; command of None disables the item.
+    `accelerator`, if given, renders as SAP's right-aligned keyboard-shortcut
+    label (e.g. 'Ctrl+F2') -- purely a visual label here, the real key isn't
+    bound.
     """
     bg = bg or MENUBAR_BG
     strip = tk.Frame(parent, bg=bg, name="menu_strip")
-    # `strip.menus`: {label: tk.Menu} -- purely so the (opt-in) automation
-    # bridge can later locate a specific pulldown's menu object by its label
-    # without needing to re-derive it from the widget tree. Never read by
-    # normal app code.
-    strip.menus = {}
-    for label, items in defs:
-        menu = tk.Menu(strip, tearoff=0)
-        for item in items:
-            item_label, command = item[0], item[1]
-            accelerator = item[2] if len(item) > 2 else ""
-            if item_label is None:
-                menu.add_separator()
-            else:
-                menu.add_command(label=item_label, command=command, accelerator=accelerator)
+    app = parent.controller
 
+    def open_menu(items, mb):
+        menu = CustomMenu(strip, app, items)
+        menu.popup(mb.winfo_rootx(), mb.winfo_rooty() + mb.winfo_height())
+
+    for label, items in defs:
         mb = tk.Button(
             strip, text=label, bg=bg, font=FONT_SMALL, padx=6, pady=2,
             name=f"menu_{label.lower().replace(' ', '_')}",
         )
-        mb.configure(command=lambda menu=menu, mb=mb: menu.tk_popup(mb.winfo_rootx(), mb.winfo_rooty() + mb.winfo_height()))
+        mb.configure(command=lambda items=items, mb=mb: open_menu(items, mb))
         mb.pack(side="left")
-        strip.menus[label] = menu
     return strip
 
 
@@ -1759,33 +1863,26 @@ def open_calendar_popup(app, on_select, initial=None):
 # ---------------------------------------------------------- object services
 def open_object_services_menu(app, x, y, on_attachment_list):
     """Object-services context menu. Only 'Attachment list' is wired."""
-    menu = tk.Menu(app, tearoff=0)
 
     def stub(label):
         return lambda: app.set_status(f"'{label}' is not implemented in this demo.")
 
-    create_menu = tk.Menu(menu, tearoff=0)
-    for label in ("Create note", "Create external document (URL)", "Store business document"):
-        create_menu.add_command(label=label, command=stub(label))
-    menu.add_cascade(label="Create", menu=create_menu)
-    menu.add_command(label="Attachment list", command=on_attachment_list)
-    menu.add_command(label="Private Note", command=stub("Private Note"))
-    send_menu = tk.Menu(menu, tearoff=0)
-    send_menu.add_command(label="Email", command=stub("Send > Email"))
-    menu.add_cascade(label="Send", menu=send_menu)
-    menu.add_command(label="Relationships", command=stub("Relationships"))
-    workflow_menu = tk.Menu(menu, tearoff=0)
-    workflow_menu.add_command(label="Start Workflow", command=stub("Workflow > Start Workflow"))
-    menu.add_cascade(label="Workflow", menu=workflow_menu)
-    myobjects_menu = tk.Menu(menu, tearoff=0)
-    myobjects_menu.add_command(label="Add to My Objects", command=stub("My Objects > Add"))
-    menu.add_cascade(label="My Objects", menu=myobjects_menu)
-    menu.add_command(label="Help for object services", command=stub("Help for object services"))
-    app._last_posted_menu = menu  # opt-in automation bridge: last transient menu shown
-    try:
-        menu.tk_popup(x, y)
-    finally:
-        menu.grab_release()
+    items = [
+        ("Create", None, "", [
+            ("Create note", stub("Create note")),
+            ("Create external document (URL)", stub("Create external document (URL)")),
+            ("Store business document", stub("Store business document")),
+        ]),
+        ("Attachment list", on_attachment_list),
+        ("Private Note", stub("Private Note")),
+        ("Send", None, "", [("Email", stub("Send > Email"))]),
+        ("Relationships", stub("Relationships")),
+        ("Workflow", None, "", [("Start Workflow", stub("Workflow > Start Workflow"))]),
+        ("My Objects", None, "", [("Add to My Objects", stub("My Objects > Add"))]),
+        ("Help for object services", stub("Help for object services")),
+    ]
+    menu = CustomMenu(app, app, items)
+    menu.popup(x, y)
     return menu
 
 
@@ -1881,27 +1978,20 @@ class AttachmentListPopup(tk.Toplevel):
 
     def open_new_menu(self):
         """'New' toolbar dropdown. Only 'Create Attachment' is wired."""
-        menu = tk.Menu(self, tearoff=0)
-        menu.add_command(label="Create Attachment", command=self.start_create_attachment)
-        menu.add_command(
-            label="Create note",
-            command=lambda: self.app.set_status("'Create note' is not implemented in this demo."),
-        )
-        menu.add_command(
-            label="Create external document (URL)",
-            command=lambda: self.app.set_status("'Create external document (URL)' is not implemented in this demo."),
-        )
-        menu.add_command(
-            label="Store business document",
-            command=lambda: self.app.set_status("'Store business document' is not implemented in this demo."),
-        )
-        self.app._last_posted_menu = menu  # opt-in automation bridge: last transient menu shown
-        try:
-            x = self._new_btn.winfo_rootx()
-            y = self._new_btn.winfo_rooty() + self._new_btn.winfo_height()
-            menu.tk_popup(x, y)
-        finally:
-            menu.grab_release()
+
+        def stub(label):
+            return lambda: self.app.set_status(f"'{label}' is not implemented in this demo.")
+
+        items = [
+            ("Create Attachment", self.start_create_attachment),
+            ("Create note", stub("Create note")),
+            ("Create external document (URL)", stub("Create external document (URL)")),
+            ("Store business document", stub("Store business document")),
+        ]
+        menu = CustomMenu(self, self.app, items)
+        x = self._new_btn.winfo_rootx()
+        y = self._new_btn.winfo_rooty() + self._new_btn.winfo_height()
+        menu.popup(x, y)
         return menu
 
     def start_create_attachment(self):
@@ -3267,43 +3357,21 @@ def _bridge_resolve_calendar_date(app, req):
 
 
 def _bridge_resolve_menu_item(app, req):
+    # All menus in this app (the Document/Edit/... pulldown strip and the
+    # transient object-services/"New" context menus) are `CustomMenu`
+    # instances now -- only one is ever posted at a time, tracked directly
+    # on the app as `_active_menu` -- so a single lookup covers every
+    # `menu` value the .robot passes ('document' or 'context'), used here
+    # only for a clearer error message.
     menu_id = req.get("menu")
     label = req.get("label")
-    if menu_id == "document":
-        screen = app.current_screen
-        strip = getattr(screen, "menu_strip", None)
-        menu = strip.menus.get("Document") if strip is not None else None
-    else:
-        # Transient context menus (object-services menu, attachment list's
-        # "New" dropdown) -- only one is ever posted at a time in this flow.
-        menu = getattr(app, "_last_posted_menu", None)
+    menu = getattr(app, "_active_menu", None)
     if menu is None:
-        return {"ok": False, "error": f"menu {menu_id!r} not found"}
-    try:
-        if not menu.winfo_ismapped():
-            return {"ok": False, "error": f"menu {menu_id!r} is not currently posted"}
-        last = menu.index("end")
-        idx = None
-        for i in range(0, (last if last is not None else -1) + 1):
-            if menu.type(i) == "separator":
-                continue
-            if menu.entrycget(i, "label") == label:
-                idx = i
-                break
-        if idx is None:
-            return {"ok": False, "error": f"no item labeled {label!r} in menu {menu_id!r}"}
-        y0 = menu.yposition(idx)
-        y1 = menu.yposition(idx + 1) if last is not None and idx < last else menu.winfo_height()
-        x = menu.winfo_rootx()
-        y = menu.winfo_rooty()
-        width = menu.winfo_width()
-        item_h = max(1, y1 - y0)
-        return {
-            "ok": True, "x": x, "y": y + y0, "width": width, "height": item_h,
-            "center_x": x + width // 2, "center_y": y + y0 + item_h // 2,
-        }
-    except tk.TclError as exc:
-        return {"ok": False, "error": str(exc)}
+        return {"ok": False, "error": f"menu {menu_id!r} is not currently posted"}
+    frame = menu.find_item(label)
+    if frame is None:
+        return {"ok": False, "error": f"no item labeled {label!r} in menu {menu_id!r}"}
+    return _bridge_bbox(frame)
 
 
 def _bridge_resolve_state(app, req):
