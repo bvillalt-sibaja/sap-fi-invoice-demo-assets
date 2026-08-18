@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Inbox - Jordan Ellis - Outlook</title>
+<style>
+  :root{
+    --ol-blue:#0a63c9;
+    --ol-blue-dark:#0854ab;
+    --ol-ribbon-bg:#f6f8fb;
+    --ol-border:#d7dbe0;
+    --ol-border-light:#e6e9ed;
+    --ol-text:#1b1b1b;
+    --ol-text-secondary:#5a5f66;
+    --ol-selected:#c7e0f4;
+    --ol-hover:#eef3f9;
+    --ol-yellow:#fdf3d4;
+    --ol-yellow-border:#e8c74a;
+    --ol-red:#c00000;
+    --ol-green:#107c10;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:var(--ol-text);background:#fff;font-size:14px;}
+  a{color:var(--ol-blue);text-decoration:none;}
+  button{font-family:inherit;}
+
+  /* ============ Title bar ============ */
+  .titlebar{
+    display:flex;align-items:center;height:30px;background:var(--ol-blue-dark);color:#fff;
+    font-size:12.5px;padding:0 8px;gap:6px;
+  }
+  .titlebar .app-icon{width:16px;height:16px;flex:none;}
+  .titlebar .title-text{flex:1;}
+  .titlebar .win-controls{display:flex;gap:2px;}
+  .titlebar .win-controls span{width:28px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;}
+  .titlebar .win-controls span:hover{background:rgba(255,255,255,.15);}
+
+  /* ============ Ribbon ============ */
+  .ribbon-tabs{
+    display:flex;align-items:center;height:32px;background:#fff;border-bottom:1px solid var(--ol-border);
+    padding:0 8px;gap:2px;font-size:13px;
+  }
+  .ribbon-tabs .tab{padding:6px 12px;cursor:pointer;color:var(--ol-text-secondary);border-radius:2px;}
+  .ribbon-tabs .tab.active{color:var(--ol-blue);font-weight:600;border-bottom:2px solid var(--ol-blue);}
+  .ribbon-tabs .tab:hover{background:var(--ol-hover);}
+  .ribbon-tabs .search-box{
+    margin-left:auto;display:flex;align-items:center;gap:6px;background:var(--ol-ribbon-bg);
+    border:1px solid var(--ol-border);border-radius:3px;padding:3px 10px;width:280px;height:22px;
+  }
+  .ribbon-tabs .search-box svg{width:13px;height:13px;fill:var(--ol-text-secondary);flex:none;}
+  .ribbon-tabs .search-box input{border:none;background:transparent;outline:none;font-size:12.5px;flex:1;color:var(--ol-text);}
+
+  .ribbon{
+    display:flex;align-items:stretch;background:var(--ol-ribbon-bg);border-bottom:1px solid var(--ol-border);
+    padding:4px 8px 2px;gap:2px;height:82px;
+  }
+  .ribbon-group{
+    display:flex;flex-direction:column;justify-content:space-between;padding:2px 10px 0;border-right:1px solid var(--ol-border-light);
+  }
+  .ribbon-group:last-child{border-right:none;}
+  .ribbon-btn-row{display:flex;gap:4px;align-items:flex-start;flex:1 1 auto;height:62px;}
+  .ribbon-btn{
+    display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 8px;border-radius:3px;
+    cursor:pointer;color:var(--ol-text);min-width:44px;
+  }
+  .ribbon-btn:hover{background:var(--ol-hover);}
+  .ribbon-btn.large svg{width:26px;height:26px;}
+  .ribbon-btn.large{font-size:11px;justify-content:flex-start;height:62px;padding-top:4px;}
+  .ribbon-btn.small{flex-direction:row;font-size:12px;padding:3px 6px;min-width:auto;gap:6px;}
+  .ribbon-btn.small svg{width:16px;height:16px;}
+  .ribbon-label{font-size:10.5px;color:var(--ol-text-secondary);text-align:center;flex:none;padding-top:2px;}
+  .ribbon-col{display:flex;flex-direction:column;gap:2px;justify-content:center;}
+
+  /* ============ App body ============ */
+  .app{display:flex;height:calc(100% - 30px - 32px - 82px - 22px);}
+
+  /* ---- Folder pane ---- */
+  .folder-pane{width:230px;flex:none;background:var(--ol-ribbon-bg);border-right:1px solid var(--ol-border);
+    overflow-y:auto;font-size:13px;padding-top:6px;}
+  .mailbox-name{display:flex;align-items:center;gap:6px;padding:6px 8px;font-weight:600;color:var(--ol-text);}
+  .mailbox-name svg{width:14px;height:14px;fill:var(--ol-text-secondary);}
+  .folder-item{display:flex;align-items:center;gap:8px;padding:4px 10px 4px 26px;cursor:pointer;color:var(--ol-text);white-space:nowrap;}
+  .folder-item:hover{background:var(--ol-hover);}
+  .folder-item.active{background:var(--ol-selected);}
+  .folder-item svg{width:15px;height:15px;flex:none;fill:var(--ol-text-secondary);}
+  .folder-item .fname{overflow:hidden;text-overflow:ellipsis;flex:1;}
+  .folder-item .fcount{color:var(--ol-text-secondary);font-size:12px;}
+  .folder-item.sub{padding-left:42px;font-size:12.5px;}
+  .folder-divider{height:1px;background:var(--ol-border);margin:6px 8px;}
+
+  /* ---- Message list (search results style) ---- */
+  .list-pane{width:380px;flex:none;border-right:1px solid var(--ol-border);display:flex;flex-direction:column;}
+  .list-header{
+    display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--ol-border);
+    font-size:12px;color:var(--ol-text-secondary);
+  }
+  .list-header .scope-btn{
+    background:var(--ol-ribbon-bg);border:1px solid var(--ol-border);border-radius:3px;padding:3px 8px;font-size:12px;
+  }
+  .list-body{flex:1;overflow-y:auto;}
+  .group-label{
+    padding:6px 12px 4px;font-size:11.5px;color:var(--ol-text-secondary);font-weight:600;
+    background:#fbfbfc;border-bottom:1px solid var(--ol-border-light);
+  }
+  .msg-row{
+    display:flex;padding:8px 12px;border-bottom:1px solid var(--ol-border-light);cursor:pointer;gap:8px;
+  }
+  .msg-row:hover{background:var(--ol-hover);}
+  .msg-row.selected{background:var(--ol-selected);}
+  .msg-row.flagged-yellow{background:var(--ol-yellow);}
+  .msg-row.flagged-yellow.selected{background:var(--ol-selected);}
+  .msg-row .row-icons{display:flex;flex-direction:column;gap:3px;padding-top:2px;flex:none;width:14px;}
+  .msg-row .row-icons svg{width:13px;height:13px;}
+  .msg-main{flex:1;min-width:0;}
+  .msg-top-line{display:flex;align-items:baseline;gap:6px;}
+  .msg-sender{font-size:13px;font-weight:600;color:var(--ol-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .msg-ext{font-size:11px;color:var(--ol-text-secondary);font-weight:400;}
+  .msg-time{margin-left:auto;font-size:11.5px;color:var(--ol-text-secondary);white-space:nowrap;flex:none;}
+  .msg-subject{font-size:12.5px;color:var(--ol-text);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .msg-preview{font-size:12px;color:var(--ol-text-secondary);margin-top:2px;display:flex;align-items:center;gap:4px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .msg-preview .caution-tag{color:var(--ol-red);font-weight:600;flex:none;}
+  .msg-folder-tag{font-size:11px;color:var(--ol-text-secondary);margin-top:1px;}
+  .search-complete-label{padding:10px 12px;color:var(--ol-text-secondary);font-size:12px;text-align:center;}
+
+  /* ---- Reading pane ---- */
+  .reading-pane{flex:1;overflow-y:auto;padding:0;background:#fff;}
+  .rp-toolbar{
+    display:flex;align-items:center;gap:8px;padding:10px 20px;border-bottom:1px solid var(--ol-border-light);
+  }
+  .rp-toolbar-btn{
+    display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ol-text);border:1px solid var(--ol-border);
+    border-radius:3px;padding:5px 12px;cursor:pointer;background:#fff;
+  }
+  .rp-toolbar-btn:hover{background:var(--ol-hover);}
+  .rp-toolbar-btn svg{width:15px;height:15px;}
+  .rp-toolbar .more{margin-left:auto;display:flex;gap:4px;}
+  .rp-toolbar .icon-only{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:3px;cursor:pointer;}
+  .rp-toolbar .icon-only:hover{background:var(--ol-hover);}
+  .rp-toolbar .icon-only svg{width:16px;height:16px;fill:var(--ol-text-secondary);}
+
+  .rp-subject{font-size:19px;font-weight:600;padding:16px 20px 4px;color:var(--ol-text);}
+  .rp-sensitivity{padding:0 20px 10px;font-size:12px;color:var(--ol-blue);display:flex;align-items:center;gap:5px;}
+  .rp-sensitivity .dot{width:8px;height:8px;border-radius:50%;background:var(--ol-blue);display:inline-block;}
+
+  .rp-header-block{display:flex;gap:12px;padding:0 20px 14px;}
+  .rp-avatar{
+    width:40px;height:40px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;
+    font-size:15px;font-weight:600;flex:none;margin-top:2px;
+  }
+  .rp-headtext{flex:1;min-width:0;font-size:13px;line-height:1.55;}
+  .rp-from-line{display:flex;align-items:baseline;gap:6px;}
+  .rp-from-name{font-weight:600;font-size:14px;color:var(--ol-text);}
+  .rp-ext-badge{
+    font-size:10.5px;color:var(--ol-text-secondary);border:1px solid var(--ol-border);border-radius:3px;padding:0 4px;
+  }
+  .rp-time{margin-left:auto;font-size:12px;color:var(--ol-text-secondary);}
+  .rp-toline{color:var(--ol-text-secondary);}
+  .rp-toline b{color:var(--ol-text);font-weight:400;}
+  .rp-followup{
+    display:flex;align-items:center;gap:6px;margin:8px 20px 2px;padding:8px 12px;background:#fbf6e5;
+    border:1px solid #eadfa8;border-radius:4px;font-size:12px;color:#6b5a1f;
+  }
+  .rp-followup svg{width:14px;height:14px;fill:#a4820a;flex:none;}
+
+  .rp-attachment-strip{margin:14px 20px 4px;}
+  .rp-attach-card{
+    display:flex;align-items:center;gap:10px;border:1px solid var(--ol-border);border-radius:4px;
+    padding:8px 10px;width:260px;background:#fafbfc;
+  }
+  .rp-attach-card:hover{background:var(--ol-hover);}
+  .rp-pdf-icon{
+    width:34px;height:34px;flex:none;border-radius:3px;background:var(--ol-red);color:#fff;display:flex;
+    align-items:center;justify-content:center;font-size:9.5px;font-weight:700;
+  }
+  .rp-attach-info{flex:1;min-width:0;}
+  .rp-attach-name{font-size:12.5px;color:var(--ol-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .rp-attach-size{font-size:11px;color:var(--ol-text-secondary);}
+  .rp-attach-actions{display:flex;gap:2px;flex:none;}
+  .rp-attach-actions .icon-only{width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:3px;cursor:pointer;}
+  .rp-attach-actions .icon-only:hover{background:#e4e9ee;}
+  .rp-attach-actions svg{width:14px;height:14px;fill:var(--ol-text-secondary);}
+
+  .rp-body{padding:16px 20px 40px;font-size:14px;line-height:1.6;color:var(--ol-text);max-width:720px;}
+  .rp-body p{margin:0 0 12px;}
+  .caution-banner{
+    display:flex;gap:8px;align-items:flex-start;background:var(--ol-red);color:#fff;
+    padding:8px 14px;font-size:12.5px;margin:14px 0 0;
+  }
+  .caution-banner svg{width:15px;height:15px;fill:#fff;flex:none;margin-top:1px;}
+  .accept-line{
+    padding:10px 0 0;font-size:13.5px;color:var(--ol-text);
+  }
+  .sig{margin-top:16px;font-size:13px;}
+  .sig .sig-cta{color:var(--ol-green);font-weight:700;margin-bottom:6px;}
+  .sig .sig-name{font-weight:700;}
+  .sig .sig-dept{color:var(--ol-text-secondary);}
+
+  .quote-header{
+    border-top:1px solid var(--ol-border);margin-top:18px;padding-top:12px;font-size:12.5px;color:var(--ol-text-secondary);line-height:1.6;
+  }
+  .quote-header b{color:var(--ol-text);font-weight:600;}
+  .quote-body{margin-top:10px;}
+
+  /* ---- Status bar ---- */
+  .statusbar{
+    height:22px;display:flex;align-items:center;gap:14px;padding:0 12px;background:var(--ol-ribbon-bg);
+    border-top:1px solid var(--ol-border);font-size:11.5px;color:var(--ol-text-secondary);
+  }
+  .statusbar .sep{width:1px;height:12px;background:var(--ol-border);}
+  .statusbar .spacer{flex:1;}
+
+  .toast{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);background:#323232;color:#fff;
+    padding:12px 22px;border-radius:4px;font-size:13px;box-shadow:0 2px 10px rgba(0,0,0,.3);
+    display:flex;align-items:center;gap:12px;opacity:0;transition:all .25s ease;z-index:50;
+  }
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+  .toast svg{width:16px;height:16px;fill:#8ab4f8;}
+
+  ::-webkit-scrollbar{width:12px;}
+  ::-webkit-scrollbar-thumb{background:#c6c6c6;border-radius:0;}
+  ::-webkit-scrollbar-track{background:#f3f3f3;}
+</style>
+</head>
+<body>
+
+<!-- ============ Title bar ============ -->
+<div class="titlebar">
+  <svg class="app-icon" viewBox="0 0 24 24"><path fill="#fff" d="M4 4h16v16H4z" opacity="0"/><path fill="#1a9fe0" d="M2 6l10-3 10 3v12l-10 3-10-3z" opacity=".0"/><rect x="2" y="4" width="20" height="16" rx="1.5" fill="#1a9fe0"/><path d="M4 6l8 5 8-5" stroke="#fff" stroke-width="1.4" fill="none"/></svg>
+  <span class="title-text">Inbox - jellis@auriaaesthetics.com - Outlook</span>
+  <div class="win-controls">
+    <span>&#8211;</span><span>&#9744;</span><span>&times;</span>
+  </div>
+</div>
+
+<!-- ============ Ribbon tabs ============ -->
+<div class="ribbon-tabs">
+  <div class="tab">File</div>
+  <div class="tab active">Home</div>
+  <div class="tab">Send / Receive</div>
+  <div class="tab">Folder</div>
+  <div class="tab">View</div>
+  <div class="tab">Help</div>
+  <div class="tab">Acrobat</div>
+  <div class="search-box">
+    <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 5L20.49 19l-5-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
+    <input type="text" value="Meridian Freight Invoice" readonly>
+  </div>
+</div>
+
+<!-- ============ Ribbon ============ -->
+<div class="ribbon">
+  <div class="ribbon-group">
+    <div class="ribbon-btn-row">
+      <div class="ribbon-btn large" onclick="showToast('Compose is disabled in this demo')">
+        <svg viewBox="0 0 24 24" fill="#1a5fb4"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        New Email
+      </div>
+    </div>
+    <div class="ribbon-label">New</div>
+  </div>
+
+  <div class="ribbon-group">
+    <div class="ribbon-btn-row">
+      <div class="ribbon-btn large" onclick="showToast('Delete is disabled in this demo')">
+        <svg viewBox="0 0 24 24" fill="#5a5f66"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        Delete
+      </div>
+      <div class="ribbon-btn large" onclick="showToast('Archive is disabled in this demo')">
+        <svg viewBox="0 0 24 24" fill="#5a5f66"><path d="M20.55 5.22l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.54L3.46 5.22C3.17 5.55 3 5.97 3 6.4V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.4c0-.43-.17-.85-.45-1.18zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5z"/></svg>
+        Archive
+      </div>
+    </div>
+    <div class="ribbon-label">Delete</div>
+  </div>
+
+  <div class="ribbon-group">
+    <div class="ribbon-btn-row">
+      <div class="ribbon-col">
+        <div class="ribbon-btn small" onclick="showToast('Reply is disabled in this demo')"><svg viewBox="0 0 24 24" fill="#5a5f66"><path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg>Reply</div>
+        <div class="ribbon-btn small" onclick="showToast('Reply All is disabled in this demo')"><svg viewBox="0 0 24 24" fill="#5a5f66"><path d="M7 8V5L0 12l7 7v-3l-4-4z"/><path d="M13 8V5l-7 7 7 7v-3.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z" fill="#5a5f66"/></svg>Reply All</div>
+        <div class="ribbon-btn small" onclick="showToast('Forward is disabled in this demo')"><svg viewBox="0 0 24 24" fill="#5a5f66"><path d="M12 8V4l8 8-8 8v-4H4V8z"/></svg>Forward</div>
+      </div>
+    </div>
+    <div class="ribbon-label">Respond</div>
+  </div>
+
+  <div class="ribbon-group">
+    <div class="ribbon-btn-row">
+      <div class="ribbon-btn large" onclick="showToast('Move is disabled in this demo')">
+        <svg viewBox="0 0 24 24" fill="#5a5f66"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+        Move
+      </div>
+      <div class="ribbon-btn large" onclick="showToast('Rules are disabled in this demo')">
+        <svg viewBox="0 0 24 24" fill="#5a5f66"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        Rules
+      </div>
+    </div>
+    <div class="ribbon-label">Move</div>
+  </div>
+
+  <div class="ribbon-group">
+    <div class="ribbon-btn-row">
+      <div class="ribbon-btn large" onclick="showToast('Flag options are disabled in this demo')">
+        <svg viewBox="0 0 24 24" fill="#c00000"><path d="M14.4 6L14 4H5v17h2v-7h6.6l.4 2h7V6z"/></svg>
+        Follow Up
+      </div>
+      <div class="ribbon-btn large" onclick="showToast('Mark unread is disabled in this demo')">
+        <svg viewBox="0 0 24 24" fill="#5a5f66"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        Unread/Read
+      </div>
+    </div>
+    <div class="ribbon-label">Tags</div>
+  </div>
+</div>
+
+<!-- ============ App body ============ -->
+<div class="app">
+
+  <!-- ---- Folder pane ---- -->
+  <div class="folder-pane">
+    <div class="mailbox-name">
+      <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+      Jordan Ellis
+    </div>
+    <div class="folder-item"><svg viewBox="0 0 24 24"><path d="M17.63 5.84C17.27 5.33 16.67 5 16 5L5 5.01C3.9 5.01 3 5.9 3 7v10c0 1.1.9 1.99 2 1.99L16 19c.67 0 1.27-.33 1.63-.84L22 12l-4.37-6.16z"/></svg><span class="fname">Denied-Rejected / Not Approved</span></div>
+    <div class="folder-item sub">Invoices</div>
+    <div class="folder-item sub">Approval Status</div>
+    <div class="folder-item"><svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg><span class="fname">Drafts</span></div>
+    <div class="folder-item"><svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg><span class="fname">Sent Items</span></div>
+    <div class="folder-item"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg><span class="fname">Deleted Items</span></div>
+    <div class="folder-item"><svg viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg><span class="fname">Junk Email</span></div>
+    <div class="folder-item"><svg viewBox="0 0 24 24"><path d="M12 8V4l8 8-8 8v-4H4V8z"/></svg><span class="fname">Outbox</span></div>
+    <div class="folder-item active"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z" opacity="0"/><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2z"/></svg><span class="fname">Statement of Accounts</span></div>
+    <div class="folder-item"><svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/></svg><span class="fname">Archive</span></div>
+    <div class="folder-item"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg><span class="fname">Conversation History</span></div>
+    <div class="folder-divider"></div>
+    <div class="mailbox-name" style="font-weight:600;">
+      <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+      Auria MedAesthetics North America - AP
+    </div>
+    <div class="folder-item sub">Business</div>
+    <div class="folder-item sub">Invoices</div>
+    <div class="folder-item sub">Sent for Approval</div>
+    <div class="folder-item sub">Statement</div>
+  </div>
+
+  <!-- ---- Message list ---- -->
+  <div class="list-pane">
+    <div class="list-header">
+      <span>Results</span>
+      <span class="scope-btn">Current Mailbox &#9662;</span>
+    </div>
+    <div class="list-body">
+      <div class="group-label">Top Results</div>
+
+      <div class="msg-row" id="row1" onclick="selectRow('row1','msg1')">
+        <div class="row-icons">
+          <svg viewBox="0 0 24 24" fill="#c00000"><path d="M14.4 6L14 4H5v17h2v-7h6.6l.4 2h7V6z"/></svg>
+        </div>
+        <div class="msg-main">
+          <div class="msg-top-line">
+            <span class="msg-sender">Meridian Freight Accounting Department</span>
+            <span class="msg-time">Tue 2:15 PM</span>
+          </div>
+          <div class="msg-subject">Meridian Freight Invoice MFL-119284 $2,829.84</div>
+          <div class="msg-preview"><span class="caution-tag">CAUTION:</span> External E-Mail. Please handle with caution! Please accept the attached...</div>
+        </div>
+      </div>
+
+      <div class="msg-row flagged-yellow selected" id="row2" onclick="selectRow('row2','msg2')">
+        <div class="row-icons">
+          <svg viewBox="0 0 24 24" fill="#c00000"><path d="M14.4 6L14 4H5v17h2v-7h6.6l.4 2h7V6z"/></svg>
+        </div>
+        <div class="msg-main">
+          <div class="msg-top-line">
+            <span class="msg-sender">Jordan Ellis</span><span class="msg-ext">(External)</span>
+            <span class="msg-time">Tue 4:52 PM</span>
+          </div>
+          <div class="msg-subject">ACTION REQUIRED: Meridian Freight Invoice MFL-119284 $2,829.84</div>
+          <div class="msg-preview">Hello, The attached invoice(s) is/are scheduled to be processed for payment. Please...</div>
+        </div>
+      </div>
+
+      <div class="group-label">Last Week</div>
+
+      <div class="msg-row" id="row3" onclick="selectRow('row3','msg3')">
+        <div class="row-icons">
+          <svg viewBox="0 0 24 24" fill="#5a5f66"><path d="M17.63 5.84C17.27 5.33 16.67 5 16 5L5 5.01C3.9 5.01 3 5.9 3 7v10c0 1.1.9 1.99 2 1.99L16 19c.67 0 1.27-.33 1.63-.84L22 12l-4.37-6.16z" opacity="0"/></svg>
+        </div>
+        <div class="msg-main">
+          <div class="msg-top-line">
+            <span class="msg-sender">Casey Whitman</span><span class="msg-ext">(External)</span>
+            <span class="msg-time">Wed 9:14 AM</span>
+          </div>
+          <div class="msg-subject">RE: ACTION REQUIRED: Meridian Freight Invoice MFL-119284 $2,829.84</div>
+          <div class="msg-preview">Approved. GL Code: 6410-Freight-Midwest. Thanks for the quick turnaround, Jordan.</div>
+        </div>
+      </div>
+
+      <div class="search-complete-label">Search Complete.</div>
+    </div>
+  </div>
+
+  <!-- ---- Reading pane ---- -->
+  <div class="reading-pane" id="readingPane">
+    <!-- content injected by JS -->
+  </div>
+</div>
+
+<!-- ============ Status bar ============ -->
+<div class="statusbar">
+  <span>Items: 3</span>
+  <span class="sep"></span>
+  <span>All folders are up to date.</span>
+  <span class="spacer"></span>
+  <span>Connected to: Microsoft Exchange</span>
+</div>
+
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+  <span id="toastMsg">Downloading Invoice_MFL119284.pdf</span>
+</div>
+
+<script>
+const INVOICE_PDF_BASE64 = "JVBERi0xLjQKJZOMi54gUmVwb3J0TGFiIEdlbmVyYXRlZCBQREYgZG9jdW1lbnQgKG9wZW5zb3VyY2UpCjEgMCBvYmoKPDwKL0YxIDIgMCBSIC9GMiAzIDAgUiAvRjMgNCAwIFIgL0Y0IDUgMCBSCj4+CmVuZG9iagoyIDAgb2JqCjw8Ci9CYXNlRm9udCAvSGVsdmV0aWNhIC9FbmNvZGluZyAvV2luQW5zaUVuY29kaW5nIC9OYW1lIC9GMSAvU3VidHlwZSAvVHlwZTEgL1R5cGUgL0ZvbnQKPj4KZW5kb2JqCjMgMCBvYmoKPDwKL0Jhc2VGb250IC9IZWx2ZXRpY2EtQm9sZE9ibGlxdWUgL0VuY29kaW5nIC9XaW5BbnNpRW5jb2RpbmcgL05hbWUgL0YyIC9TdWJ0eXBlIC9UeXBlMSAvVHlwZSAvRm9udAo+PgplbmRvYmoKNCAwIG9iago8PAovQmFzZUZvbnQgL0hlbHZldGljYS1Cb2xkIC9FbmNvZGluZyAvV2luQW5zaUVuY29kaW5nIC9OYW1lIC9GMyAvU3VidHlwZSAvVHlwZTEgL1R5cGUgL0ZvbnQKPj4KZW5kb2JqCjUgMCBvYmoKPDwKL0Jhc2VGb250IC9IZWx2ZXRpY2EtT2JsaXF1ZSAvRW5jb2RpbmcgL1dpbkFuc2lFbmNvZGluZyAvTmFtZSAvRjQgL1N1YnR5cGUgL1R5cGUxIC9UeXBlIC9Gb250Cj4+CmVuZG9iago2IDAgb2JqCjw8Ci9Db250ZW50cyAxMCAwIFIgL01lZGlhQm94IFsgMCAwIDYxMiA3OTIgXSAvUGFyZW50IDkgMCBSIC9SZXNvdXJjZXMgPDwKL0ZvbnQgMSAwIFIgL1Byb2NTZXQgWyAvUERGIC9UZXh0IC9JbWFnZUIgL0ltYWdlQyAvSW1hZ2VJIF0KPj4gL1JvdGF0ZSAwIC9UcmFucyA8PAoKPj4gCiAgL1R5cGUgL1BhZ2UKPj4KZW5kb2JqCjcgMCBvYmoKPDwKL1BhZ2VNb2RlIC9Vc2VOb25lIC9QYWdlcyA5IDAgUiAvVHlwZSAvQ2F0YWxvZwo+PgplbmRvYmoKOCAwIG9iago8PAovQXV0aG9yIChhbm9ueW1vdXMpIC9DcmVhdGlvbkRhdGUgKEQ6MjAyNjA4MTcxODAxMDcrMDAnMDAnKSAvQ3JlYXRvciAoYW5vbnltb3VzKSAvS2V5d29yZHMgKCkgL01vZERhdGUgKEQ6MjAyNjA4MTcxODAxMDcrMDAnMDAnKSAvUHJvZHVjZXIgKFJlcG9ydExhYiBQREYgTGlicmFyeSAtIFwob3BlbnNvdXJjZVwpKSAKICAvU3ViamVjdCAodW5zcGVjaWZpZWQpIC9UaXRsZSAodW50aXRsZWQpIC9UcmFwcGVkIC9GYWxzZQo+PgplbmRvYmoKOSAwIG9iago8PAovQ291bnQgMSAvS2lkcyBbIDYgMCBSIF0gL1R5cGUgL1BhZ2VzCj4+CmVuZG9iagoxMCAwIG9iago8PAovRmlsdGVyIFsgL0FTQ0lJODVEZWNvZGUgL0ZsYXRlRGVjb2RlIF0gL0xlbmd0aCAxODI3Cj4+CnN0cmVhbQpHYXVgVD5BcjRkJ1JvTVMzNzpqLltYcXFqcDoqbWs4RDU3UiZxUltCV25kbWItQWY0TzdeZCJNQm4tJSU/W3RedSxfMnBpODxCc0ExWyJVX0IrPiQkXlRAPnRSL3JpUWQudEotRVVbbXM4S3R0bV5tWTUmSSpbQTFuJSNjTjpEZFo3X2dqRjI0NToiVl4jQjNrXCZCK2A5LEFYaF5uaSpnbTUmdUMxaGVvWUssP2VKLUc3JThAMV5GKkhPS2c7aTRpS2VgXXQ+cSdqTCIxNy82cUdeVUtgcEdSZCJrTVNobjEkQTdaY15dOjUvJVh1IVZJI0YucSRHQFFWNl4sQz5VdTApM2s0byhrZEt1MCVySmJyaTtLIlx0MSw7Li0/dDxrWCVZIXR0ZScqZV1wOTdLW0BiWFlNW1U6ZlE0WnI4bklkJUpPJCtNNXMiQVksUFRYRWlWRCVWWjhRImRxRCtIO09IMl9AI1ghUzpTXlZgJlFlXDFCUkZMSlxjKltzdVY6Vi9JaVNhWCE5azdZMCNEa1AhKFk3MFNoLWIuMyEhNGkmTypqYUYqZmQyRiJsZW1ZYENfZytUOCZBTSVHY0E2RiY5QUskU1RacmtFW0J0WSQ5SnFkLmBYIlQtNmA+SSxnaERrPjZhVW9rRTI1KElsNDBSMDo6W15HSDlyNzwnckosYiwja0ZHRSdILTU8ZWo3WmZjZzJoUFw6RmUyYFYvJGsyJ2BdSWcpKm1VI2ZBcUkjMCNFTWtiXjAoLlB0SUlOSj1RLildUF0yUS86WlVhaVM5az5BdSVfbUBoW2ciPz1IazRhNDRCWidZYmFTdUQhaVJ0MGVsU19gSmVeNGBfUTt1TC04TGE7bDM7RldWQDFwSWhPRkknPWdwXlwoI11rWDs5WGRBVy9QJDkvZUtiYCNfXnBYS0U3RzE+PlVGOkVIZFxaLyplJ2VsRUo2NUFRRWdYWi1sdUsoUTVbOFlbcmVvJldqXDJdal50SkdQYjhfbStuc0pzUDtKZEdCJ3QxNExLX20pOHJWTj07QmUjNkNbRENrRDkjN2NYM2RDYE1nMSJOYD4oWzBbVDNuR2dATExqTGhwRjVXJzZ1O0NdPmhNLS1TV2IqKWlrZE4qczxsVE1wMjZtLHU1WDRPdXBGK0poTzJBQVc8NFFDOiRvbyEvV0dVP1ZpbiF1XzNaQTdiW0Y8SyJoMkQ4ZWN0UW8kXExWS0paKFc2LFkyXTVUcW1sJE0mJT9zRipxRXVrViExL1g6XDtePkkpJUM4LytZODpiIXAoMWA9aGU+RzpTc20kZlhZSjg0a0FdIlZBUVkiKUFlW0JwJm5nMD9DczJwZ0JhOTIrPWs0NTs/KTFtLzZTbit1L0FFdWQzNj5QRjo0TTE4U0coPTw7M0lYS2ZUR2UyTGtzOjo5cTE7MSxtYj5RLnNcMFBFIWVOcSRKNSJXZlo9XShXMkRkX0dgVFlqVm5QQ15TaTpNOkssR3AkWE1gb2VWSzclUWdFRSJxSilxaDtmTVhAVWcuN2lmW0M7N0FFTEpDVEc9U14wM18iOFlcV0RHTDlDMVUnQSUyMUtvWFo3aDdWRF9gZDViTlhgNjQldUFhaWI0Xz9zPUckVGkzXVkrTU1DZWB0Yk4zNHVTPVtDLSwlMi89cWIwSWg7KXIibSNmckpnXU85Pm0xOUM6dXQzcVFXPGAwQGRYJ2llUCY0PCFucDo8IzNdQCFIbyprJlQiM0YtLmlURXFyRFVzQm5ZIl4/JDQySz1qOyIsWHAhXGlfWUBRSFtiZ25eR1lNalRnbDdjXTIrczxkQkFoKkQmYGpTYm4xYkMzNE4ka0piN08/S1ZcV05yXmlTJTxIW1Z0dSVPUiFKTjc5Q3VzI1sxZGpVaDZHMyxMOEVRVmozNUVkQFVzT08+XFotKUNudGdGI14yMCVmYS9kalYrc0VqcTQjZ2ptMCI4QmgyTmhYVk0zTD1OQmU4OENnXjhTZSQvZWdhLTdSX0ckPCJDRCxaKFJhUWZAOSsma0goKi8+ZEQjdVs+OTxbMzlAKzlOXUViMkpuXj1nZTdLJG9VbCtIam5ia0BVcEMxSiZOJ2xcQk03b2NdbyVcOVVdbE1LckwwJ20iRT4rOG1qKEFhIVIvSyZsbTRMVVg/OC9KZD4+cnNSJU89bkMhRkorQycoYT08S2tPVSlZZHA4RWJDK05uUF87J0gkYzhgaC1QJm5MLk1rNjA2bDksSEorPiwhYiRoS2tuZjotcnA6YF9VWGlSMCREbFtsYT1WSHQsR2s0QChyX0I6ZFZULkgnTSgwTkEzaEQzKXBNX2slWyk2LG1jZEopXDsmZ25NVkZTZy4+RCNqPklzLjVULGYuNFNMRU4vbTQoNmheNmIsIW5VOlBVPm88US82PC1aOUkuOlhGJTIlWEBYZ01nVk4pfj5lbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCAxMQowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwNjEgMDAwMDAgbiAKMDAwMDAwMDEyMiAwMDAwMCBuIAowMDAwMDAwMjI5IDAwMDAwIG4gCjAwMDAwMDAzNDggMDAwMDAgbiAKMDAwMDAwMDQ2MCAwMDAwMCBuIAowMDAwMDAwNTc1IDAwMDAwIG4gCjAwMDAwMDA3NjkgMDAwMDAgbiAKMDAwMDAwMDgzNyAwMDAwMCBuIAowMDAwMDAxMDk4IDAwMDAwIG4gCjAwMDAwMDExNTcgMDAwMDAgbiAKdHJhaWxlcgo8PAovSUQgCls8Mjg0MDI0MDk4N2FmODI5ZjE4NmNhMzdmNjUxMDAyYzc+PDI4NDAyNDA5ODdhZjgyOWYxODZjYTM3ZjY1MTAwMmM3Pl0KJSBSZXBvcnRMYWIgZ2VuZXJhdGVkIFBERiBkb2N1bWVudCAtLSBkaWdlc3QgKG9wZW5zb3VyY2UpCgovSW5mbyA4IDAgUgovUm9vdCA3IDAgUgovU2l6ZSAxMQo+PgpzdGFydHhyZWYKMzA3NgolJUVPRgo=";
+
+const attachmentHTML = `
+  <div class="rp-attachment-strip">
+    <div class="rp-attach-card">
+      <div class="rp-pdf-icon">PDF</div>
+      <div class="rp-attach-info">
+        <div class="rp-attach-name">Invoice_MFL119284.pdf</div>
+        <div class="rp-attach-size">148 KB</div>
+      </div>
+      <div class="rp-attach-actions">
+        <div class="icon-only" title="Preview" onclick="event.stopPropagation(); showToast('Preview is disabled in this demo')">
+          <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 12.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8a3 3 0 100 6 3 3 0 000-6z"/></svg>
+        </div>
+        <div class="icon-only" title="Download" onclick="event.stopPropagation(); downloadInvoice();">
+          <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+`;
+
+const messages = {
+  msg1: {
+    avatarColor: "#c43e1c", initials: "MF",
+    from: "Meridian Freight Accounting Department", ext: "(External)",
+    to: "Jordan Ellis",
+    time: "Tuesday, August 11, 2026 2:15 PM",
+    subject: "Meridian Freight Invoice MFL-119284 $2,829.84",
+    followup: null,
+    attachment: true,
+    bodyHTML: `
+      <div class="caution-banner">
+        <svg viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
+        <span>CAUTION: External E-Mail. Please handle with caution!</span>
+      </div>
+      <p class="accept-line">Please accept the attached invoice from Meridian Freight Lines Billing Department.</p>
+    `
+  },
+  msg2: {
+    avatarColor: "#188038", initials: "JE",
+    from: "Jordan Ellis", ext: "(External)",
+    to: "Casey Whitman - Midwest Region Accounts Payable",
+    time: "Tuesday, August 11, 2026 4:52 PM",
+    subject: "ACTION REQUIRED: Meridian Freight Invoice MFL-119284 $2,829.84",
+    followup: "Start by: Tuesday, August 11, 2026. Due by: Thursday, August 13, 2026, 5:00 PM.",
+    attachment: true,
+    bodyHTML: `
+      <p>Hello,</p>
+      <p>The attached invoice(s) is/are scheduled to be processed for payment.</p>
+      <p>Please review, approve, and include the Coding.</p>
+      <p><b><u>Please respond within 2 business days.</u></b></p>
+      <p>Thank you very much for your prompt response.</p>
+      <p style="color:#107c10;font-weight:700;">Make It A Great Day!!!</p>
+      <div class="sig">
+        <div class="sig-name">Jordan Ellis</div>
+        <div class="sig-dept">ACCOUNTS PAYABLE SPECIALIST<br>AURIA FINANCE &amp; ACCOUNTING SERVICES</div>
+        <div>office: <a href="#">auriaaesthetics.com</a> &nbsp;|&nbsp; 1450 Innovation Parkway, Madison, WI 53713</div>
+      </div>
+      <div class="quote-header">
+        <b>From:</b> Meridian Freight Accounting Department &lt;billing@meridianfreight.com&gt;<br>
+        <b>Sent:</b> Tuesday, August 11, 2026 2:15 PM<br>
+        <b>To:</b> Auria MedAesthetics - Accounts Payable &lt;ap@auriaaesthetics.com&gt;<br>
+        <b>Subject:</b> Meridian Freight Invoice MFL-119284 $2,829.84
+      </div>
+      <div class="caution-banner" style="margin-top:12px;">
+        <svg viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
+        <span>CAUTION: External E-Mail. Please handle with caution!</span>
+      </div>
+      <p class="accept-line">Please accept the attached invoice from Meridian Freight Lines Billing Department.</p>
+    `
+  },
+  msg3: {
+    avatarColor: "#1a5fb4", initials: "CW",
+    from: "Casey Whitman", ext: "(External)",
+    to: "Jordan Ellis",
+    time: "Wednesday, August 12, 2026 9:14 AM",
+    subject: "RE: ACTION REQUIRED: Meridian Freight Invoice MFL-119284 $2,829.84",
+    followup: null,
+    attachment: false,
+    bodyHTML: `
+      <p>Approved. GL Code: 6410-Freight-Midwest.</p>
+      <p>Thanks for the quick turnaround, Jordan.</p>
+      <p>Casey</p>
+      <div class="quote-header">
+        <b>From:</b> Jordan Ellis &lt;ap@auriaaesthetics.com&gt;<br>
+        <b>Sent:</b> Tuesday, August 11, 2026 4:52 PM<br>
+        <b>To:</b> Casey Whitman - Midwest Region Accounts Payable &lt;cwhitman@auriaaesthetics.com&gt;<br>
+        <b>Subject:</b> ACTION REQUIRED: Meridian Freight Invoice MFL-119284 $2,829.84
+      </div>
+      <div class="quote-body" style="font-size:13px;color:#5a5f66;">
+        Hello, The attached invoice(s) is/are scheduled to be processed for payment. Please review, approve, and include the Coding. Please respond within 2 business days...
+      </div>
+    `
+  }
+};
+
+function renderMessage(id){
+  const m = messages[id];
+  const followupHTML = m.followup ? `
+    <div class="rp-followup">
+      <svg viewBox="0 0 24 24"><path d="M14.4 6L14 4H5v17h2v-7h6.6l.4 2h7V6z"/></svg>
+      <span>Follow up. ${m.followup}</span>
+    </div>` : '';
+  const html = `
+    <div class="rp-toolbar">
+      <div class="rp-toolbar-btn" onclick="showToast('Reply is disabled in this demo')">
+        <svg viewBox="0 0 24 24" fill="#5a5f66"><path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg>Reply
+      </div>
+      <div class="rp-toolbar-btn" onclick="showToast('Reply All is disabled in this demo')">
+        <svg viewBox="0 0 24 24" fill="#5a5f66"><path d="M13 8V5l-7 7 7 7v-3.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg>Reply All
+      </div>
+      <div class="rp-toolbar-btn" onclick="showToast('Forward is disabled in this demo')">
+        <svg viewBox="0 0 24 24" fill="#5a5f66"><path d="M12 8V4l8 8-8 8v-4H4V8z"/></svg>Forward
+      </div>
+      <div class="more">
+        <div class="icon-only" title="More"><svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg></div>
+      </div>
+    </div>
+    <div class="rp-subject">${m.subject}</div>
+    <div class="rp-sensitivity"><span class="dot"></span> Internal</div>
+    <div class="rp-header-block">
+      <div class="rp-avatar" style="background:${m.avatarColor};">${m.initials}</div>
+      <div class="rp-headtext">
+        <div class="rp-from-line">
+          <span class="rp-from-name">${m.from}</span>
+          <span class="rp-ext-badge">${m.ext}</span>
+          <span class="rp-time">${m.time}</span>
+        </div>
+        <div class="rp-toline">To: <b>${m.to}</b></div>
+      </div>
+    </div>
+    ${followupHTML}
+    ${m.attachment ? attachmentHTML : ''}
+    <div class="rp-body">${m.bodyHTML}</div>
+  `;
+  document.getElementById('readingPane').innerHTML = html;
+}
+
+function selectRow(rowId, msgId){
+  document.querySelectorAll('.msg-row').forEach(r => r.classList.remove('selected'));
+  document.getElementById(rowId).classList.add('selected');
+  renderMessage(msgId);
+}
+
+let toastTimer;
+function showToast(msg){
+  const toast = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 3200);
+}
+
+function downloadInvoice(){
+  try{
+    const byteChars = atob(INVOICE_PDF_BASE64);
+    const byteNumbers = new Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], {type:'application/pdf'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Invoice_MFL119284.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    showToast('Downloading Invoice_MFL119284.pdf');
+  }catch(e){
+    showToast('Download failed in this preview environment');
+  }
+}
+
+// Initial render: match screenshot 3 (msg2 selected)
+renderMessage('msg2');
+</script>
+</body>
+</html>
